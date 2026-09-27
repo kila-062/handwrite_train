@@ -1,2 +1,7 @@
 *.filters
 *.exe
+.clangd
+x64/
+*.vcxproj.user
+*.idx3-ubyte
+*.idx1-ubyte
