@@ -4,7 +4,7 @@
 #include <cstdint>
 #define WIDTH 28
 #define HEIGHT 28
-#define HIDDEN_LAYER_NUM 15
+#define HIDDEN_LAYER_NUM 100
 
 using namespace std;
 class Layer {

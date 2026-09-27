@@ -4,10 +4,16 @@
 #include <fstream>
 #include <cmath>
 #define SCALAR 10
-#define IMG_NUM 10
-inline double sigmoid(double x) {
-    return 1.0 / (1.0 + exp(-x));
-}
+#define IMG_NUM 60000
+#define TRAIN_TIME 30
+#define LABEL_PATH "d:/c/dosomething/dosomething/src/train-labels.idx1-ubyte"
+#define TRAIN_DATA_PATH "d:/c/dosomething/dosomething/src/train-images.idx3-ubyte"
+inline double sigmoid(double x) { return 1.0 / (1.0 + exp(-x)); }
+
+
+
+
+//这个主要起到调试作用，看数据有没有被正确读取
 void save_as_ppm(MnistImages src_data) {
     for(int i = 0;i<=20;i++){
         ofstream outfile;
@@ -39,13 +45,40 @@ void save_as_ppm(MnistImages src_data) {
 }
 
 void save_as_bin(vector<double> data) {
-
-
+    //之后写，目前思路是将用到图层的weight和bias打包，需要有一个头来表示图层数量，数据大小，下面的body直接写入数据
 }
 
-void train_pass(MnistImages images, Layer &layer, Layer &hidden){
+//这个函数封装主要为了服务于目前的3层模型，后面如果再加隐藏层的话不能使用
+void forward_pass(Layer& layer, Layer& hidden,
+                  const vector<double>& x,
+                  vector<double>& h,
+                  vector<double>& a)
+{
+    layer.set_input(x);
+    layer.feed_forward();
+    const auto& z1 = layer.get_output();
+    for (int i = 0; i < (int)h.size(); ++i)
+        h[i] = sigmoid(z1[i]);
 
-    auto labels = load_labels("d:/c/dosomething/dosomething/src/train-labels.idx1-ubyte");
+    hidden.set_input(h);
+    hidden.feed_forward();
+    const auto& z2 = hidden.get_output();
+    for (int o = 0; o < (int)a.size(); ++o)
+        a[o] = sigmoid(z2[o]);
+}
+double compute_loss(const vector<double>& a, int label) {
+    double loss = 0;
+    for (int o = 0; o < (int)a.size(); ++o) {
+        double y = (o == label) ? 1.0 : 0.0;
+        loss += -(y * log(a[o] + 1e-9)
+                + (1.0 - y) * log(1.0 - a[o] + 1e-9));
+    }
+    return loss;
+}
+
+void train_pass(MnistImages images,vector<double> &all_data ,Layer &layer, Layer &hidden,int epochs){
+
+    auto labels = load_labels(LABEL_PATH);
     cout << "load" << images.N << " pictures "
                   << images.rows << "x" << images.cols << "\n";
 
@@ -56,94 +89,91 @@ void train_pass(MnistImages images, Layer &layer, Layer &hidden){
     vector<double> db1(layer.get_bias().size(), 0.0);
 
 
-      // 中间缓存
+    // 中间缓存
     vector<double> h(layer.get_output_num());
     vector<double> a(hidden.get_output_num());
     vector<double> dz2(hidden.get_output_num());
     vector<double> dz1(layer.get_output_num());
-
+    vector<double> train_data(WIDTH * HEIGHT);
     const double lr = 0.1;
-    int img_count = 0;
-    int image_data_index = 0;
-    for(;img_count<IMG_NUM;img_count++){
-        vector<double> train_data(WIDTH * HEIGHT);
-        for (int y = 0; y < HEIGHT*WIDTH; y++,image_data_index++) {
 
-            train_data[y] = images.data[image_data_index]/255.0;//数据需要除以255.0
+    for (int train_times = 0; train_times < epochs; train_times++) {
+        int img_count = 0;
+        int image_data_index = 0;
+        //double total_loss = 0.0;
+        int correct = 0;
+        for(;img_count<IMG_NUM;img_count++){
 
-        }
+            for (int y = 0; y < HEIGHT*WIDTH; y++,image_data_index++) {
 
+                train_data[y] = all_data[image_data_index];
 
-        // ============ 4. 训练前的预测 ============
-        auto forward = [&]() {
-            layer.set_input(train_data);
-            layer.feed_forward();
-            const auto& z1 = layer.get_output();
-            for (int i = 0; i <h.size(); ++i) h[i] = sigmoid(z1[i]);
-
-            hidden.set_input(h);
-            hidden.feed_forward();
-            const auto& z2 = hidden.get_output();
-            for (int o = 0; o < 10; ++o) a[o] = sigmoid(z2[o]);
-        };
-
-        int label   = labels[img_count];
-        auto compute_loss = [&]() {
-            double loss = 0;
-            for (int o = 0; o < a.size(); ++o) {
-                double y = (o == label) ? 1.0 : 0.0;
-                loss += -(y * log(a[o] + 1e-9) + (1.0 - y) * std::
-                          log(1.0 - a[o] + 1e-9));
             }
-            return loss;
-        };
 
-        forward();
-        cout << "before: label=" << label
-             << "  loss=" << compute_loss() << "\n";
+            // 让输入层和隐藏层都执行一次feedforward
+
+            forward_pass(layer, hidden, train_data,h,a);
+
+            int label   = labels[img_count];
 
 
-        // ============ 5. 反向 + 更新 ============
-        // --- dz2 = a - y  (sigmoid + BCE 的输出层梯度) ---
-        for (int o = 0; o < 10; ++o)
-            dz2[o] = a[o] - ((o == label) ? 1.0 : 0.0);
+            //取到总loss,这里可以节省性能省略
+            //total_loss += compute_loss(a,label);
+            int pred = hidden.get_result();//这里取到每个图像的结果，目前用的是取概率最大值，暂时先这样（因为用的是sigmoid，所以现在没问题）
+            if (pred == label)
+                correct++;
 
-        std::fill(dW2.begin(), dW2.end(), 0.0);
-        std::fill(db2.begin(), db2.end(), 0.0);
-        vector<double> dh = hidden.backward(dz2, dW2, db2);   // 得到 dL/dh
 
-        // --- dz1 = dh * h * (1 - h)   (sigmoid 导数) ---
-        for (int i = 0; i < 15; ++i)
-            dz1[i] = dh[i] * h[i] * (1.0 - h[i]);
+            // 反向传播 + 更新bias和weight
+            // --- dz2 = a - y  (sigmoid + BCE 的输出层梯度) ---
+            for (int o = 0; o < 10; ++o)
+                dz2[o] = a[o] - ((o == label) ? 1.0 : 0.0);
 
-        std::fill(dW1.begin(), dW1.end(), 0.0);
-        std::fill(db1.begin(), db1.end(), 0.0);
-        layer.backward(dz1, dW1, db1);
+            fill(dW2.begin(), dW2.end(), 0.0);
+            fill(db2.begin(), db2.end(), 0.0);
+            vector<double> dh = hidden.backward(dz2, dW2, db2);   // 得到 dL/dh
 
-        // --- 更新两层参数 ---
-        layer.apply_gradients(dW1, db1, lr);
-        hidden.apply_gradients(dW2, db2, lr);
+            // --- dz1 = dh * h * (1 - h)   (sigmoid 导数) ---
+            for (int i = 0; i < 15; ++i)
+                dz1[i] = dh[i] * h[i] * (1.0 - h[i]);
 
-        // ============ 6. 训练后的预测 ============
-        forward();
-        cout << "after : label=" << label << "  loss=" << compute_loss()
-             << "\n";
+            fill(dW1.begin(), dW1.end(), 0.0);
+            fill(db1.begin(), db1.end(), 0.0);
+            layer.backward(dz1, dW1, db1);
 
-        cout << "trained" << img_count << "times" << endl;
+            //更新两层参数
+            layer.apply_gradients(dW1, db1, lr);
+            hidden.apply_gradients(dW2, db2, lr);
+
+            }
+        int N = IMG_NUM;
+        double acc = (double)correct / IMG_NUM;
+        cout << "epoch "
+             << train_times
+            //loss可省略
+            //<< "  avg_loss = " << total_loss / IMG_NUM
+             << "  train_acc = " << acc << endl;
+
     }
-
 }
 int main()
 {
 
-    MnistImages images = load_images("d:/c/dosomething/dosomething/src/train-images.idx3-ubyte");
+    MnistImages images = load_images(TRAIN_DATA_PATH);
+
+    // 训练前提前把数据/255，减少计算
+    vector<double> all_data(size_t(images.N) * WIDTH * HEIGHT);
+    for (size_t i = 0; i < all_data.size(); ++i)
+        all_data[i] = images.data[i] / 255.0;
+
 
     Layer layer;
 
     Layer hidden(15,10);
 
-    train_pass(images,layer,hidden);
+    train_pass(images,all_data,layer,hidden,TRAIN_TIME);
 
     system("pause");
+
     return 0;
 }

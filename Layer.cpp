@@ -1,21 +1,32 @@
 #include "Layer.h"
+#include <random>
 
-Layer::Layer(int i ,int o) :input(i,0.0), output(o, 0.0), weight(i*o, 0.0),bias(o,0.0),input_num(i),output_num(o) {}
+Layer::Layer(int i, int o)
+    : input(i, 0.0), output(o, 0.0), weight(i * o, 0.0), bias(o, 0.0),
+      input_num(i), output_num(o)
+{
+    // Xavier 初始化：标准差 sqrt(1 / input_num)
+    static mt19937 gen(42);   // 固定种子，结果可复现
+    normal_distribution<double> dist(0.0, sqrt(1.0 / i));
+    for (auto& w : weight) w = dist(gen);
+    for (auto& b : bias)   b = 0.0;   // bias 可以保持 0
+}
+
 
 
 
 void Layer::feed_forward() {
 
-    // ����ÿһ�����ز���Ԫ
+    // ±éÀúÃ¿Ò»¸öÒþ²Ø²ãÉñ¾­Ôª
     for (int z = 0; z < output_num; ++z) {
         double sum = 0.0f;
 
-        // ����չƽ���������������
+        // ±éÀúÕ¹Æ½ºóµÄËùÓÐÊäÈëÏñËØ
         for (int i = 0; i < input_num; ++i) {
             sum += input[i] * weight[z*input_num+i];
         }
         sum += bias[z];
-        // ����Ȩ�͸�ֵ�����ز���Ԫ���˴��ɼӼ�������� ReLU/Sigmoid��
+        // ½«¼ÓÈ¨ºÍ¸³Öµ¸øÒþ²Ø²ãÉñ¾­Ôª£¨´Ë´¦¿É¼Ó¼¤»îº¯Êý£¬Èç ReLU/Sigmoid£©
         output[z] = sum;
     }
 }
@@ -62,7 +73,7 @@ vector<double> Layer::backward(const vector<double>& dz,
 
         for (int i = 0; i < input_num; ++i) {
             gw[i] += g * input[i];     // dL/dW[o,i] = dz[o] * x[i]
-            dx[i] += g * wrow[i];      // dL/dx[i] = �� dz[o] * W[o,i]
+            dx[i] += g * wrow[i];      // dL/dx[i] = ¦² dz[o] * W[o,i]
         }
         db[o] += g;                    // dL/db[o] = dz[o]
     }
