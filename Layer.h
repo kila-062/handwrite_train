@@ -1,20 +1,17 @@
 #pragma once
-#include <vector>
-#include <iostream>
+#include "config.h"
 #include <cstdint>
-#define WIDTH 28
-#define HEIGHT 28
-#define HIDDEN_LAYER_NUM 100
+#include <iostream>
+#include <vector>
 
 using namespace std;
 class Layer {
-public:
+  public:
+    Layer(int input_num = WIDTH * HEIGHT, int output_num = HIDDEN_LAYER_NUM);
 
-	Layer(int input_num = WIDTH*HEIGHT,int output_num = HIDDEN_LAYER_NUM);
+    void feed_forward();
 
-	void feed_forward();
-
-	const vector<double>& get_output() const;
+    const vector<double> &get_output() const;
 
     int get_result() const;
 
@@ -22,32 +19,33 @@ public:
 
     const vector<double> &get_bias() const;
 
-    const int &get_output_num()const;
+    const int &get_output_num() const;
 
     const int &get_input_num() const;
 
-    void set_input(const vector<double>& new_input);
+    size_t get_weight_size() const;
 
-	vector<double> backward(const vector<double>& dz,
-                               vector<double>& dW,
-                               vector<double>& db) const;//dW是权重，db是bias
+    size_t get_bias_size() const;
 
-    void apply_gradients(const vector<double>& dW,
-                            const vector<double>& db,
-                            double lr);//dW是权重，db是bias，lr是学习率，用来更新权重，bias和学习率
-private:
-	vector<double>input;
+    void set_input(const vector<double> &new_input);
 
-	vector<double>output;
+    vector<double> backward(const vector<double> &dz, vector<double> &dW,
+                            vector<double> &db) const; // dW是权重，db是bias
 
-	vector<double>weight;
+    void apply_gradients(
+        const vector<double> &dW, const vector<double> &db,
+        double
+            lr); // dW是权重，db是bias，lr是学习率，用来更新权重，bias和学习率
+  private:
+    vector<double> input;
+
+    vector<double> output;
+
+    vector<double> weight;
 
     vector<double> bias;
 
-	int input_num;
+    int input_num;
 
-	int output_num;
-
-
-
+    int output_num;
 };

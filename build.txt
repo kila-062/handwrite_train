@@ -1,0 +1,1 @@
+g++ -O3 -march=native main.cpp Layer.cpp tool.cpp -o main.exe
