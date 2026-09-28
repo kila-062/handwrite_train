@@ -20,7 +20,7 @@ void save_as_ppm(MnistImages src_data) {
         outfile.open(path, ios::out | ios::binary | ios::trunc);
         char head[32];
         sprintf(head, "P6\n%d %d 255\n", WIDTH, HEIGHT);
-        // outfile << "P6\n"  << WIDTH << " " << HEIGHT << endl << "255" <<endl;
+
         outfile << head;
         for (int s = 0; s < HEIGHT; s++) {
 
