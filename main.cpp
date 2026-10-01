@@ -40,30 +40,42 @@ void save_as_ppm(MnistImages src_data) {
 }
 typedef struct {
     unsigned long long data_size;
-    vector<double> weight_1;
-    vector<double> bias_1;
-    vector<double> weight_2;
-    vector<double> bias_2;
+    char p[0];
 
 } Bin_head;
+
+void save_layer(ofstream &f, Layer &L) {
+
+    f.write((char *)L.get_weight().data(),
+            L.get_weight().size() * sizeof(double));
+    f.write((char *)L.get_bias().data(), L.get_bias().size() * sizeof(double));
+}
+
+void load_layer(ifstream &i, Layer &L) {
+
+    i.read((char *)L.get_weight().data(), L.get_weight_size());
+
+    i.read((char *)L.get_bias().data(), L.get_bias_size());
+}
 
 void save_as_bin(Layer layer, Layer hidden) {
 
     ofstream outfile;
-    outfile.open("src/result_data.bin", ios::out | ios::binary | ios::trunc);
-    Bin_head head;
-    // layer size = weight size + bias size;
-    head.data_size = layer.get_weight_size() + layer.get_bias_size() +
-                     hidden.get_weight_size() + hidden.get_bias_size();
-    // 目前先写死结构
-    vector<double> weight_1 = layer.get_weight();
-    vector<double> bias_1 = layer.get_bias();
-    vector<double> weight_2 = hidden.get_weight();
-    vector<double> bias_2 = hidden.get_bias();
+    outfile.open(AFTER_DATA_PATH, ios::out | ios::binary | ios::trunc);
 
-    outfile.write((const char *)&head, sizeof(head));
+    save_layer(outfile, layer);
+    save_layer(outfile, hidden);
 
     outfile.close();
+}
+
+void load_bin_data(Layer &layer, Layer &hidden) {
+    ifstream infile;
+    infile.open(AFTER_DATA_PATH, ios::binary);
+
+    load_layer(infile, layer);
+
+    load_layer(infile, hidden);
 }
 
 // 这个函数封装主要为了服务于目前的3层模型，后面如果再加隐藏层的话不能使用
@@ -123,7 +135,11 @@ double Test_result(Layer &layer, Layer &hidden, const MnistImages &test_images,
 
         if (result == labels[img_count])
             acc++;
+        else if (result != labels[img_count])
+            cout << "wrong label = " << static_cast<int>(labels[img_count])
+                 << " image count = " << img_count << endl;
     }
+    cout << "test_acc = " << acc / test_images.N << endl;
     return acc / test_images.N;
 }
 void train_pass(MnistImages &images, vector<double> &all_data, Layer &layer,
@@ -133,6 +149,8 @@ void train_pass(MnistImages &images, vector<double> &all_data, Layer &layer,
     auto labels = load_labels(LABEL_PATH);
     cout << "load" << images.N << " pictures " << images.rows << "x"
          << images.cols << "\n";
+    // 最大正确率
+    int max_acc = 0;
 
     // 梯度缓冲区，在循环外分配一次
     vector<double> dW2(hidden.get_weight().size(),
@@ -204,13 +222,18 @@ void train_pass(MnistImages &images, vector<double> &all_data, Layer &layer,
              // loss可省略
              //<< "  avg_loss = " << total_loss / IMG_NUM
              << "  train_acc = " << acc;
+
         double test_acc =
             Test_result(layer, hidden, test_images, all_test_data);
 
-        cout << " test_acc = " << test_acc << endl;
+        if (test_acc > max_acc) {
+
+            max_acc = test_acc;
+            save_as_bin(layer, hidden);
+        }
     }
 }
-
+#if WANT_TO_TRAIN
 int main() {
 
     MnistImages images = load_images(TRAIN_DATA_PATH);
@@ -236,3 +259,20 @@ int main() {
 
     return 0;
 }
+#endif
+
+#if WANT_TO_TEST
+int main() {
+    MnistImages test_images = load_images(TEST_IMG_PATH);
+    vector<double> test_data(size_t(test_images.N) * WIDTH * HEIGHT);
+    for (size_t i = 0; i < test_data.size(); ++i)
+        test_data[i] = test_images.data[i] / 255.0;
+    Layer layer;
+    Layer hidden(HIDDEN_LAYER_NUM, 10);
+    load_bin_data(layer, hidden);
+    double acc = Test_result(layer, hidden, test_images, test_data);
+
+    system("pause");
+    return 0;
+}
+#endif

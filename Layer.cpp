@@ -40,6 +40,10 @@ const int &Layer::get_output_num() const { return output_num; }
 
 const int &Layer::get_input_num() const { return input_num; }
 
+void Layer::set_bias(vector<double> &new_bias) { bias = new_bias; }
+
+void Layer::set_weight(vector<double> &new_weight) { weight = new_weight; }
+
 size_t Layer::get_weight_size() const {
     auto weight_bytesize = weight.size() * sizeof(double);
     return weight_bytesize;

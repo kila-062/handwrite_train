@@ -29,6 +29,10 @@ class Layer {
 
     void set_input(const vector<double> &new_input);
 
+    void set_bias(vector<double> &new_bias);
+
+    void set_weight(vector<double> &new_weight);
+
     vector<double> backward(const vector<double> &dz, vector<double> &dW,
                             vector<double> &db) const; // dW是权重，db是bias
 
